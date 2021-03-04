@@ -1,0 +1,78 @@
+ constructor(
+        address payable _beneficiary
+    ) public {
+        // set as the MartianMarket
+        deployer = msg.sender;
+        beneficiary = _beneficiary;
+    }
+    ///bid on the auction with the value sent
+    /// together with this transaction.
+    ///the value will only be refunded if the auction is not won 
+
+    function bid(address payable sender) public payable {
+        // if bid is higher, send money back
+        
+        require ( 
+            msg.value > highestBid,
+        "There already is a higher bid");
+        
+        require (!ended, "auctionEnd has already been called.");
+        
+        if ( highestBid !=0) {
+            ///Sending back the money to sender
+            pendingReturns [highestBidder] += highestBid;
+        }
+        highestBidder = sender;
+        highestBid = msg.value;
+        emit HighestBidIncreased ( sender, msg.value);
+    }
+
+    function withdraw() public returns (bool) {
+        uint amount = pendingReturns [msg.sender];
+        
+        if(amount > 0 ) {
+            /// Reseting the amount owing
+            pendingReturns [msg.sender] = amount;
+            
+            if (!msg.sender.send(amount)) {
+                // No need to call throw here, just reset the amount owing
+                pendingReturns[msg.sender] = amount;
+                return false;
+            }
+        }
+        return true;
+    }
+    
+
+    function pendingReturn(address sender) public view returns (uint) {
+        return pendingReturns[sender];
+        
+    }
+    
+    /// End the auction and send the highest bid to the beneficiery
+    
+
+    function auctionEnd() public {
+        // It is a good guideline to structure functions that interact with other contracts (i.e. they call functions or send Ether)
+        // into three phases:
+        // 1. checking conditions
+        // 2. performing actions (potentially changing conditions)
+        // 3. interacting with other contracts
+        // If these phases are mixed up, the other contract could call back into the current contract and modify the state or cause
+        // effects (ether payout) to be performed multiple times.
+        // If functions called internally include interaction with external contracts, they also have to be considered interaction with
+        // external contracts.
+
+        // 1. Conditions
+        
+        require(!ended, "auctionEnd has already been called.");
+        require(msg.sender == deployer, "You are not the auction deployer!");
+        
+        // 2. Effects
+        ended = true;
+        emit AuctionEnded(highestBidder, highestBid);
+
+        // 3. Interaction
+        beneficiary.transfer(highestBid);
+    }
+}
